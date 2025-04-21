@@ -1,31 +1,40 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
 
 export default function Home() {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState<{ type: 'user' | 'bot', text: string }[]>([])
+  const chatEndRef = useRef<HTMLDivElement | null>(null)
 
-  const sendMessage = async () => {
-    if (!input.trim()) return
-    const userMessage = input
+  // เลื่อนลงล่างอัตโนมัติเมื่อมีข้อความใหม่
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chat])
+
+  const sendMessage = useCallback(async () => {
+    const trimmed = input.trim()
+    if (!trimmed) return
+
     setInput('')
-    setChat([...chat, { type: 'user', text: userMessage }])
+    setChat(prev => [...prev, { type: 'user', text: trimmed }])
 
     try {
-      const res = await axios.post('/api/chat', { message: userMessage })
+      const res = await axios.post('/api/chat', { message: trimmed })
       const reply = res.data.reply
       setChat(prev => [...prev, { type: 'bot', text: reply }])
-    } catch (err) {
+    } catch {
       setChat(prev => [...prev, { type: 'bot', text: '❌ ระบบเกิดข้อผิดพลาด' }])
     }
-  }
+  }, [input])
 
   return (
     <div className="min-h-screen bg-white text-black p-6 flex flex-col">
-      <div className="text-3xl font-bold text-center mb-6">💬 Gemini AI Chatbot</div>
+      <header className="text-3xl font-bold text-center mb-6">
+        💬 Gemini AI Chatbot
+      </header>
 
-      <div className="flex-1 overflow-y-auto space-y-4 px-2 max-w-2xl mx-auto">
+      <main className="flex-1 overflow-y-auto space-y-4 px-2 max-w-2xl mx-auto w-full">
         {chat.map((c, i) => (
           <div
             key={i}
@@ -38,9 +47,10 @@ export default function Home() {
             {c.text}
           </div>
         ))}
-      </div>
+        <div ref={chatEndRef} />
+      </main>
 
-      <div className="flex mt-4 max-w-2xl mx-auto w-full">
+      <footer className="flex mt-4 max-w-2xl mx-auto w-full">
         <input
           type="text"
           placeholder="พิมพ์ข้อความ..."
@@ -50,12 +60,13 @@ export default function Home() {
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
         />
         <button
-          className="bg-blue-600 text-white px-6 py-3 rounded-r-xl hover:bg-blue-700"
+          className="bg-blue-600 text-white px-6 py-3 rounded-r-xl hover:bg-blue-700 transition"
           onClick={sendMessage}
         >
           ส่ง
         </button>
-      </div>
+      </footer>
     </div>
   )
 }
+
