@@ -5,6 +5,7 @@ import axios from 'axios'
 export default function Home() {
   const [input, setInput] = useState('')
   const [chat, setChat] = useState<{ type: 'user' | 'bot', text: string }[]>([])
+  const [loading, setLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
   // เลื่อนลงล่างอัตโนมัติเมื่อมีข้อความใหม่
@@ -14,19 +15,29 @@ export default function Home() {
 
   const sendMessage = useCallback(async () => {
     const trimmed = input.trim()
-    if (!trimmed) return
+    if (!trimmed || loading) return
 
     setInput('')
     setChat(prev => [...prev, { type: 'user', text: trimmed }])
+    setLoading(true)
 
     try {
       const res = await axios.post('/api/chat', { message: trimmed })
-      const reply = res.data.reply
-      setChat(prev => [...prev, { type: 'bot', text: reply }])
-    } catch {
-      setChat(prev => [...prev, { type: 'bot', text: '❌ ระบบเกิดข้อผิดพลาด' }])
+
+      // แสดงข้อความที่ตอบกลับ
+      if (res.data.reply) {
+        setChat(prev => [...prev, { type: 'bot', text: res.data.reply }])
+      } else {
+        setChat(prev => [...prev, { type: 'bot', text: '❌ ไม่มีข้อความตอบกลับจากระบบ' }])
+      }
+    } catch (err: any) {
+      console.error('❌ API Error:', err?.response?.data || err.message || err)
+      const errorMsg = err?.response?.data?.error || '❌ ระบบเกิดข้อผิดพลาด'
+      setChat(prev => [...prev, { type: 'bot', text: errorMsg }])
+    } finally {
+      setLoading(false)
     }
-  }, [input])
+  }, [input, loading])
 
   return (
     <div className="min-h-screen bg-white text-black p-6 flex flex-col">
@@ -47,6 +58,11 @@ export default function Home() {
             {c.text}
           </div>
         ))}
+        {loading && (
+          <div className="mr-auto bg-gray-100 text-black px-4 py-2 rounded-xl max-w-[80%]">
+            ⏳ กำลังประมวลผล...
+          </div>
+        )}
         <div ref={chatEndRef} />
       </main>
 
@@ -58,15 +74,18 @@ export default function Home() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          disabled={loading}
         />
         <button
-          className="bg-blue-600 text-white px-6 py-3 rounded-r-xl hover:bg-blue-700 transition"
+          className={`px-6 py-3 rounded-r-xl transition text-white ${
+            loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
           onClick={sendMessage}
+          disabled={loading}
         >
-          ส่ง
+          {loading ? 'ส่ง...' : 'ส่ง'}
         </button>
       </footer>
     </div>
   )
 }
-
